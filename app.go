@@ -17,6 +17,7 @@ func main() {
 	// Define command-line flags for input file and output folder.
 	inputFile := flag.String("input", "", "Input file containing list of URLs")
 	outputDir := flag.String("output", "", "Output folder to save downloaded files")
+	proxyURL := flag.String("proxy", "", "Proxy server to use (e.g., 127.0.0.1:8080)")
 	flag.Parse()
 
 	// Check if arguments were provided as positional arguments instead of flags
@@ -27,7 +28,7 @@ func main() {
 
 	// Ensure both input and output are provided.
 	if *inputFile == "" || *outputDir == "" {
-		fmt.Println("Usage: downloadFilesFromList -input=<inputfile> -output=<outputfolder>")
+		fmt.Println("Usage: downloadFilesFromList -input=<inputfile> -output=<outputfolder> [-proxy=<proxyaddress>]")
 		fmt.Println("   or: downloadFilesFromList <inputfile> <outputfolder>")
 		os.Exit(1)
 	}
@@ -55,7 +56,7 @@ func main() {
 			continue
 		}
 		// Download each URL.
-		err = downloadFile(line, *outputDir)
+		err = downloadFile(line, *outputDir, *proxyURL)
 		if err != nil {
 			fmt.Printf("Failed to download %s: %v\n", line, err)
 		} else {
@@ -69,8 +70,33 @@ func main() {
 }
 
 // downloadFile fetches the content from fileURL and saves it into outputDir.
-func downloadFile(fileURL, outputDir string) error {
-	resp, err := http.Get(fileURL)
+func downloadFile(fileURL, outputDir, proxyURL string) error {
+	// Create a new request
+	req, err := http.NewRequest("GET", fileURL, nil)
+	if err != nil {
+		return fmt.Errorf("error creating request: %v", err)
+	}
+
+	// Set the User-Agent header
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36")
+
+	// Create HTTP client with optional proxy
+	client := &http.Client{}
+	
+	// Configure proxy if specified
+	if proxyURL != "" {
+		proxyURLParsed, err := url.Parse("http://" + proxyURL)
+		if err != nil {
+			return fmt.Errorf("error parsing proxy URL: %v", err)
+		}
+		transport := &http.Transport{
+			Proxy: http.ProxyURL(proxyURLParsed),
+		}
+		client.Transport = transport
+	}
+	
+	// Send the request
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("http get error: %v", err)
 	}
